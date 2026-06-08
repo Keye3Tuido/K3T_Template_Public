@@ -1,0 +1,8 @@
+[submodule "read_files"]
+	path = read_files
+	url = https://github.com/Keye3Tuido/K3T_Template_Private.git
+	branch = read
+[submodule "write_files"]
+	path = write_files
+	url = https://github.com/Keye3Tuido/K3T_Template_Private.git
+	branch = write

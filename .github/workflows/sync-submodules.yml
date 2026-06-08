@@ -1,0 +1,101 @@
+name: Sync Submodules & Run Script
+
+on:
+  repository_dispatch:
+    types: [read-files-updated]
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "sync-submodules"
+  cancel-in-progress: false
+
+env:
+  TOKEN: ${{ secrets.K3T_REPOS }}
+  PRIVATE_REPO: Keye3Tuido/K3T_Template_Private
+
+jobs:
+  sync-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      # ============================================================
+      # Step 0: Configure git token for private repo access
+      # ============================================================
+      - name: Configure git token
+        run: |
+          git config --global url."https://x-access-token:${{ env.TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+      # ============================================================
+      # Step 1: Checkout Public repo (skip submodule init)
+      # ============================================================
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ env.TOKEN }}
+          submodules: false
+
+      # ============================================================
+      # Step 2: Sync read_files
+      # ============================================================
+      - name: Sync read_files
+        run: |
+          rm -rf read_files
+          git clone --branch read --single-branch \
+            https://github.com/${{ env.PRIVATE_REPO }}.git \
+            read_files
+          git add read_files
+
+      # ============================================================
+      # Step 3: Write current SHA to Private/write branch
+      # ============================================================
+      - name: Write SHA to Private/write branch
+        run: |
+          git clone --branch write --single-branch \
+            https://github.com/${{ env.PRIVATE_REPO }}.git \
+            /tmp/private-write
+
+          cd /tmp/private-write
+          > write_file
+          echo "${{ github.sha }}" > write_file
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add write_file
+          git diff --cached --quiet || git commit -m "chore: sync SHA from K3T_Template_Public"
+          git push origin write
+
+      # ============================================================
+      # Step 4: Sync write_files
+      # ============================================================
+      - name: Sync write_files
+        run: |
+          rm -rf write_files
+          git clone --branch write --single-branch \
+            https://github.com/${{ env.PRIVATE_REPO }}.git \
+            write_files
+          git add write_files
+
+      # ============================================================
+      # Step 5: Commit and push to main
+      # ============================================================
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: sync submodules [skip ci]" || true
+          git push origin main || true
+
+      # ============================================================
+      # Step 6: Run some_script
+      # ============================================================
+      - name: Run some_script
+        run: |
+          if [ -f some_script ]; then
+            chmod +x some_script
+            ./some_script
+          else
+            echo "⚠️  some_script not found — skipping"
+          fi

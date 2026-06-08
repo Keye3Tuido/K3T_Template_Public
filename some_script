@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "✅ some_script executed — placeholder"
